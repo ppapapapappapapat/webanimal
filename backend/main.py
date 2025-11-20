@@ -2835,13 +2835,15 @@ def debug_db_schema():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
+    # Get port from environment variable or default to 5000
+    port = int(os.environ.get("PORT", 5000))
+    
     print("\n" + "="*50)
     print("🚀 Animal Detection Backend Starting...")
     print("📍 Project Location:", os.path.dirname(os.path.abspath(__file__)))
-    print("🌐 Server URL: http://192.168.73.38:5000")  # Changed to HTTP and correct IP
-    print("🔍 Health Check: http://192.168.73.38:5000/health")
-    print("📱 Mobile Access: http://192.168.73.38:5000")
-    print("👥 Admin Users: http://192.168.73.38:5000/api/admin/users")
+    print("🌐 Running on port:", port)
+    print("🔍 Health Check: /health")
+    print("📱 Server started successfully!")
     
     # Print all your existing routes information...
     print("📷 Available Detection Modes:")
@@ -2856,8 +2858,8 @@ if __name__ == '__main__':
     print("   - POST /api/admin/users (Create User)")
     print("   - PATCH /api/admin/users/:id (Update User)")
     print("   - DELETE /api/admin/users/:id (Delete User)")
-    print("✅ Backend running on HTTP for development!")
+    print("✅ Backend ready for production!")
     print("="*50)
     
-    # Remove SSL for development - run on HTTP
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Run for production on Render
+    app.run(debug=False, host='0.0.0.0', port=port)
