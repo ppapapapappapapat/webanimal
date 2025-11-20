@@ -1,0 +1,12 @@
+[build]
+builder = "nixpacks"
+buildCommand = "npm run build"
+
+[deploy]
+startCommand = "npm start"  # This will now run 'next start'
+
+[environments]
+  [environments.production]
+    [environments.production.variables]
+      PORT = "3000"
+      NODE_ENV = "production"
