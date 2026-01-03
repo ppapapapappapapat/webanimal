@@ -1,0 +1,10 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "python main.py"
+
+[environments]
+  [environments.production]
+    [environments.production.variables]
+      PORT = "5000"

@@ -1,19 +1,20 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone', // ✅ Essential for Railway
+  // Remove output: 'export' since you need server functionality
   trailingSlash: true,
   reactStrictMode: true,
   poweredByHeader: false,
-  
   images: {
-    domains: ['images.unsplash.com', 'localhost', '*.up.railway.app'], // ✅ Add Railway domain
+    domains: ['images.unsplash.com'],
     formats: ['image/avif', 'image/webp'],
-    unoptimized: true, // ✅ Important for Railway
   },
-  
-  env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
-  }
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['localhost:3000'],
+      bodySizeLimit: '2mb'
+    },
+    optimizeCss: true,
+  },
 };
 
 export default nextConfig;

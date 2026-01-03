@@ -1,4 +1,5 @@
 import os
+import sys
 import uuid
 import pandas as pd
 import cv2
@@ -10,18 +11,34 @@ from flask_bcrypt import Bcrypt
 from datetime import datetime
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, send_from_directory
-import os
 import logging
 from datetime import datetime, timedelta 
 import json
 from sqlalchemy import text
 import ssl
 
-# Direct imports (no try-except for TensorFlow)
+# NEW ADD UPDATE
+import string
+import random
+from flask_mail import Mail, Message
+
+
+# FIXED TensorFlow imports
 import tensorflow as tf
-from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing import image # type: ignore
-from tensorflow.keras.utils import img_to_array
+# Use tf.keras instead of tensorflow.keras
+load_model = tf.keras.models.load_model
+
+# Add cv2 import if not already there
+try:
+    import cv2
+    CV2_AVAILABLE = True
+except ImportError:
+    print("⚠️ OpenCV not installed. Run: pip install opencv-python")
+    CV2_AVAILABLE = False
+
+# Clean TensorFlow imports
+import tensorflow as tf
+print(f"✅ TensorFlow version: {tf.__version__}")
 
 from typing import List, Optional, TYPE_CHECKING
 from datetime import datetime
@@ -68,9 +85,122 @@ app.config['SQLALCHEMY_DATABASE_URI'] = (
 )
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# NEW UPDATE
+# ================= MAILER CONFIGURATION =================
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = os.getenv('EMAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.getenv('EMAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = (
+    os.getenv('EMAIL_SENDER_NAME'),
+    os.getenv('EMAIL_USERNAME')
+)
+
+
 # Initialize extensions
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
+# NEW UPDATE
+mail = Mail(app)
+
+
+# ================= EMAIL FUNCTION FOR ADMIN UPDATES =================
+def send_admin_update_email(user_email, user_name, report_species, admin_message, report_status=None, report_details=None):
+    """Send email notification to user about admin update on their report"""
+    try:
+        print(f"📧 Preparing to send email to {user_email} for {report_species} report")
+        
+        # Create message
+        msg = Message(
+            subject=f"📢 AnimalCare+ Update: Your {report_species} Report",
+            recipients=[user_email],
+            sender=app.config['MAIL_DEFAULT_SENDER']
+        )
+        
+        # Prepare admin message HTML-safe
+        admin_message_html = admin_message.replace('\n', '<br>')
+
+        # Create HTML email
+        msg.html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .header {{ background: linear-gradient(135deg, #4CAF50, #2E7D32); color: white; padding: 30px; text-align: center; }}
+                .content {{ padding: 30px; }}
+                .message-box {{ background-color: #f9f9f9; border-left: 4px solid #4CAF50; padding: 20px; margin: 20px 0; }}
+                .footer {{ text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 12px; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🐾 AnimalCare+ Report Update</h1>
+                </div>
+                
+                <div class="content">
+                    <h2>Hello {user_name},</h2>
+                    <p>Your wildlife report has been updated by our admin team.</p>
+                    
+                    <h3 style="color: #2E7D32;">Report: {report_species}</h3>
+                    
+                    {f"<p><strong>Status:</strong> {report_status.replace('_', ' ').title()}</p>" if report_status else ""}
+                    
+                    <div class="message-box">
+                        <h4 style="margin-top: 0; color: #2E7D32;">Admin Message:</h4>
+                        <p>{admin_message_html}</p>
+                    </div>
+                    
+                    {f'<p><strong>Details:</strong><br>{report_details}</p>' if report_details else ''}
+                    
+                    <p>You can view your report and check for updates by logging into your AnimalCare+ dashboard.</p>
+                    
+                    <p>Thank you for helping protect wildlife!</p>
+                </div>
+                
+                <div class="footer">
+                    <p>This is an automated message from AnimalCare+ Wildlife Monitoring System.</p>
+                    <p>📍 Wildlife Conservation Center | 🌍 Protecting Endangered Species</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Plain text version
+        msg.body = f"""
+AnimalCare+ Report Update
+
+Hello {user_name},
+
+Your wildlife report for {report_species} has been updated by our admin team.
+
+Admin Message:
+{admin_message}
+
+{("Status: " + report_status.replace('_', ' ').title()) if report_status else ""}
+
+You can view your report and check for updates by logging into your AnimalCare+ dashboard.
+
+Thank you for helping protect wildlife!
+
+Best regards,
+The AnimalCare+ Team
+
+This is an automated message. Please do not reply to this email.
+"""
+        
+        # Send the email
+        mail.send(msg)
+        print(f"✅ Email sent successfully to {user_email}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Failed to send email to {user_email}: {e}")
+        return False
 
 # ================= FIXED DATABASE MODELS =================
 class User(db.Model):
@@ -80,6 +210,8 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(120), nullable=False)
     role = db.Column(db.String(20), default='user')
+    is_verified = db.Column(db.Boolean, default=False)
+    email_verification_token = db.Column(db.String(6), nullable=True) 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_active = db.Column(db.Boolean, default=True)
     
@@ -120,6 +252,7 @@ class Sighting(db.Model):
     lifespan = db.Column(db.String(50))
     population = db.Column(db.String(100))
     recommended_care = db.Column(db.Text)
+    character_traits = db.Column(db.Text)  # ADDED: Character traits field
     
     # NEW: Detailed sighting information
     sighting_date = db.Column(db.DateTime)
@@ -155,6 +288,7 @@ class Sighting(db.Model):
             'lifespan': self.lifespan,
             'population': self.population,
             'recommended_care': self.recommended_care,
+            'character_traits': self.character_traits,  # ADDED: Character traits
             'sighting_date': self.sighting_date.isoformat() if self.sighting_date else None,
             'specific_location': self.specific_location,
             'number_of_animals': self.number_of_animals,
@@ -229,6 +363,7 @@ class Report(db.Model):
                 'lifespan': self.sighting.lifespan,
                 'population': self.sighting.population,
                 'recommended_care': self.sighting.recommended_care,
+                'character_traits': self.sighting.character_traits,  # ADDED: Character traits
                 'image_path': self.sighting.image_path,
                 'detection_type': self.sighting.detection_type,
                 'sighting_date': self.sighting.sighting_date.isoformat() if self.sighting.sighting_date else None,
@@ -250,6 +385,7 @@ class Report(db.Model):
                 'lifespan': None,
                 'population': None,
                 'recommended_care': None,
+                'character_traits': None,  # ADDED: Character traits
                 'image_path': None,
                 'detection_type': 'manual_report'
             }
@@ -294,7 +430,11 @@ class UserNotification(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_read = db.Column(db.Boolean, default=False)
     report_data = db.Column(db.JSON)
-
+    
+    # ✅ ADD THESE 2 LINES:
+    email_sent = db.Column(db.Boolean, default=False)
+    email_error = db.Column(db.Text)
+    
     # Relationships
     user = db.relationship('User', backref='notifications')
     report = db.relationship('Report', backref='notifications')
@@ -323,6 +463,7 @@ class UserNotification(db.Model):
         habitat = None
         population = None
         recommended_care = None
+        character_traits = None  # ADDED: Character traits
         image_path = None
         evidence_images = []
         
@@ -344,6 +485,7 @@ class UserNotification(db.Model):
             habitat = self.report_data.get('habitat')
             population = self.report_data.get('population')
             recommended_care = self.report_data.get('recommended_care')
+            character_traits = self.report_data.get('character_traits')  # ADDED: Character traits
             image_path = self.report_data.get('image_path')
             evidence_images = self.report_data.get('evidence_images', [])
             
@@ -364,6 +506,7 @@ class UserNotification(db.Model):
             habitat = self.report.sighting.habitat
             population = self.report.sighting.population
             recommended_care = self.report.sighting.recommended_care
+            character_traits = self.report.sighting.character_traits  # ADDED: Character traits
             image_path = self.report.sighting.image_path
             evidence_images = self.report.evidence_images or []
         
@@ -377,6 +520,9 @@ class UserNotification(db.Model):
             'admin_notes': self.admin_notes,
             'created_at': self.created_at.isoformat(),
             'is_read': self.is_read,
+             # ✅ ADD THESE 2 LINES:
+            'email_sent': self.email_sent,
+            'email_error': self.email_error,
             'confidence': confidence,
             'condition': condition,
             'condition_confidence': condition_confidence,
@@ -385,6 +531,7 @@ class UserNotification(db.Model):
             'habitat': habitat,
             'population': population,
             'recommended_care': recommended_care,
+            'character_traits': character_traits,  # ADDED: Character traits
             'image_path': image_path,
             'evidence_images': evidence_images,
             'detailed_sighting_data': detailed_sighting_data,
@@ -409,7 +556,7 @@ print(f"📁 Our project folder is: {BASE_DIR}")
 
 MODEL_DIR = os.path.join(BASE_DIR, "public", "models", "onnx_models")
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
-CONDITION_MODEL_PATH = os.path.join(BASE_DIR, "public", "models", "conditions_models", "optimized_model.h5")
+CONDITION_MODEL_PATH = os.path.join(BASE_DIR, "public", "models", "conditions_models", "cnn_final_model.h5")
 ANIMAL_DATA_PATH = os.path.join(BASE_DIR, "animal_data.csv")
 
 # ================= AUTOMATIC DIRECTORY CREATION =================
@@ -421,8 +568,7 @@ print("🔄 Checking if all model files exist...")
 
 required_files = {
     "Mammals Model": os.path.join(MODEL_DIR, "best.onnx"),
-    "Birds Model 1": os.path.join(MODEL_DIR, "best2.onnx"),
-    "Birds Model 2": os.path.join(MODEL_DIR, "best3.onnx"),
+    "Birds Model": os.path.join(MODEL_DIR, "best2.onnx"),
     "Condition Model": CONDITION_MODEL_PATH,
     "Animal Data": ANIMAL_DATA_PATH
 }
@@ -444,10 +590,7 @@ condition_labels = ["Healthy", "Injured", "Malnourished"]
 try:
     models = {
         "mammals": [YOLO(os.path.join(MODEL_DIR, "best.onnx"), task='detect')],
-        "birds": [
-            YOLO(os.path.join(MODEL_DIR, "best2.onnx"), task='detect'),
-            YOLO(os.path.join(MODEL_DIR, "best3.onnx"), task='detect'),
-        ],
+        "birds": [YOLO(os.path.join(MODEL_DIR, "best2.onnx"), task='detect')],
     }
     print("✅ YOLO models loaded successfully!")
     
@@ -455,19 +598,119 @@ try:
     for model_type, model_list in models.items():
         print(f"  {model_type}: {len(model_list)} models loaded")
         for i, model in enumerate(model_list):
-            print(f"    Model {i+1}: {model}")
+            print(f"    Model 1: {model}")
             
 except Exception as e:
     print(f"❌ Failed to load YOLO models: {e}")
 
+
 try:
-    if TENSORFLOW_AVAILABLE and load_model is not None:
-        condition_model = load_model(CONDITION_MODEL_PATH)
-        print("✅ Condition model loaded successfully!")
+    if TENSORFLOW_AVAILABLE:
+        print(f"🔄 Loading condition model from: {CONDITION_MODEL_PATH}")
+        
+        if not os.path.exists(CONDITION_MODEL_PATH):
+            print(f"❌ Model file not found!")
+            condition_model = None
+        else:
+            # WORKAROUND 1: Try loading with custom objects first
+            print("🔄 Attempting to load with batch_shape workaround...")
+            
+            from tensorflow.keras.layers import InputLayer
+            
+            # Create a custom InputLayer that handles batch_shape parameter
+            class CompatibleInputLayer(InputLayer):
+                def __init__(self, *args, **kwargs):
+                    # Check if batch_shape is in kwargs (this is the problematic parameter)
+                    if 'batch_shape' in kwargs:
+                        print(f"⚠️  Detected batch_shape parameter: {kwargs['batch_shape']}")
+                        # Convert batch_shape to input_shape
+                        batch_shape_val = kwargs.pop('batch_shape')
+                        if batch_shape_val and len(batch_shape_val) == 4:
+                            # batch_shape is (None, 150, 150, 3)
+                            # input_shape should be (150, 150, 3)
+                            kwargs['input_shape'] = batch_shape_val[1:]
+                            print(f"✅ Converted batch_shape to input_shape: {kwargs['input_shape']}")
+                    
+                    # Call parent constructor
+                    super().__init__(*args, **kwargs)
+            
+            try:
+                # Method 1: Try with custom objects
+                condition_model = tf.keras.models.load_model(
+                    CONDITION_MODEL_PATH,
+                    custom_objects={'InputLayer': CompatibleInputLayer},
+                    compile=False
+                )
+                print("✅ Condition model loaded successfully with batch_shape workaround!")
+            except Exception as e1:
+                print(f"⚠️  Method 1 failed: {e1}")
+                
+                # Method 2: Try loading just the architecture and weights separately
+                print("🔄 Trying alternative loading method...")
+                try:
+                    # Load model without custom objects first
+                    condition_model = tf.keras.models.load_model(
+                        CONDITION_MODEL_PATH,
+                        compile=False
+                    )
+                    print("✅ Condition model loaded (simple method worked!)")
+                except:
+                    # Method 3: Try to rebuild the model
+                    print("🔄 Attempting to rebuild model architecture...")
+                    try:
+                        # Based on your model's input shape (150, 150, 3) and 3 output classes
+                        from tensorflow.keras.models import Sequential
+                        from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+                        
+                        # Build a model with similar architecture
+                        model = Sequential([
+                            Conv2D(32, (3, 3), activation='relu', input_shape=(150, 150, 3)),
+                            MaxPooling2D(2, 2),
+                            Conv2D(64, (3, 3), activation='relu'),
+                            MaxPooling2D(2, 2),
+                            Conv2D(128, (3, 3), activation='relu'),
+                            MaxPooling2D(2, 2),
+                            Flatten(),
+                            Dense(512, activation='relu'),
+                            Dropout(0.5),
+                            Dense(3, activation='softmax')
+                        ])
+                        
+                        # Try to load weights
+                        model.load_weights(CONDITION_MODEL_PATH)
+                        condition_model = model
+                        print("✅ Model rebuilt and weights loaded!")
+                    except Exception as e3:
+                        print(f"❌ All loading methods failed: {e3}")
+                        condition_model = None
+            
+            if condition_model:
+                # Print model details
+                print(f"📋 Model details:")
+                print(f"   Input shape: {condition_model.input_shape}")
+                print(f"   Output shape: {condition_model.output_shape}")
+                
+                # Test prediction
+                try:
+                    import numpy as np
+                    # Create dummy input matching the model's expected input shape
+                    dummy_input = np.random.random((1, 150, 150, 3)).astype(np.float32)
+                    prediction = condition_model.predict(dummy_input, verbose=0)
+                    print(f"✅ Model test passed!")
+                    print(f"   Output shape: {prediction.shape}")
+                    print(f"   Sample output: {prediction[0]}")
+                except Exception as test_error:
+                    print(f"⚠️ Model test warning: {test_error}")
+        
     else:
-        print("❌ TensorFlow not available - skipping condition model")
+        print("❌ TensorFlow not available")
+        condition_model = None
+        
 except Exception as e:
     print(f"❌ Failed to load condition model: {e}")
+    import traceback
+    traceback.print_exc()
+    condition_model = None
 
 try:
     if os.path.exists(ANIMAL_DATA_PATH):
@@ -500,6 +743,26 @@ def initialize_database():
                     print("✅ Added detailed_sighting_data column to report table")
             except Exception as e:
                 print(f"⚠️ Could not check/alter table structure: {e}")
+            
+            try:
+                result = db.session.execute(text("DESCRIBE user_notification"))
+                columns = [row[0] for row in result]
+                
+                if 'email_sent' not in columns:
+                    print("🔄 Adding email_sent column...")
+                    db.session.execute(text("ALTER TABLE user_notification ADD COLUMN email_sent BOOLEAN DEFAULT FALSE"))
+                
+                if 'email_error' not in columns:
+                    print("🔄 Adding email_error column...")
+                    db.session.execute(text("ALTER TABLE user_notification ADD COLUMN email_error TEXT"))
+                
+                db.session.commit()
+                print("✅ Email fields added")
+            except Exception as e:
+                print(f"⚠️ Email fields: {e}")
+            
+        except Exception as e:
+            print(f"❌ Database initialization failed: {e}")   
             
             # ✅ ADD: Check and add report_data column to user_notification
             try:
@@ -548,6 +811,18 @@ def initialize_database():
             except Exception as e:
                 print(f"⚠️ Could not create admin_history table: {e}")
             
+            # ✅ ADD: Check and add character_traits column to sighting
+            try:
+                result = db.session.execute(text("DESCRIBE sighting"))
+                columns = [row[0] for row in result]
+                if 'character_traits' not in columns:
+                    print("🔄 Adding missing column: character_traits to sighting")
+                    db.session.execute(text("ALTER TABLE sighting ADD COLUMN character_traits TEXT"))
+                    db.session.commit()
+                    print("✅ Added character_traits column to sighting table")
+            except Exception as e:
+                print(f"⚠️ Could not check/alter sighting table structure: {e}")
+            
             admin = User.query.filter_by(username='admin').first()
             if not admin:
                 admin = User()
@@ -590,36 +865,80 @@ fix_database_schema()
 
 # ================= HELPER FUNCTIONS =================
 def analyze_condition(img_path: str):
-    if (condition_model is None or 
-        not TENSORFLOW_AVAILABLE or 
-        image is None or 
-        tf is None or
-        img_to_array is None):
-        return {"error": "Condition model not available"}
+    """Analyze animal condition using your trained CNN model"""
+    if condition_model is None:
+        print("⚠️ Condition model not available!")
+        return {"label": "Unknown", "confidence": 0.0}
     
     try:
-        img = image.load_img(img_path, target_size=(224, 224))
-        img_array = img_to_array(img)
-        img_array = np.expand_dims(img_array, axis=0) / 255.0
-
-        preds = condition_model.predict(img_array, verbose=0)[0]
+        print(f"🔍 Analyzing condition for: {os.path.basename(img_path)}")
         
-        def softmax(x):
-            exp_x = np.exp(x - np.max(x))
-            return exp_x / np.sum(exp_x)
+        import cv2
+        import numpy as np
         
-        preds_softmax = softmax(preds)
-        preds_clean = np.nan_to_num(preds_softmax, nan=0.0, posinf=0.0, neginf=0.0)
-        top_idx = int(np.argmax(preds_clean))
-        top_condition = condition_labels[top_idx] if top_idx < len(condition_labels) else "Unknown"
-        top_confidence = round(float(preds_clean[top_idx]) * 100, 2)
-
-        return {"label": top_condition, "confidence": top_confidence}
+        # 1. Load image with OpenCV
+        img = cv2.imread(img_path)
+        if img is None:
+            print(f"❌ Could not read image")
+            return {"label": "Unknown", "confidence": 0.0}
+        
+        print(f"✅ Image loaded: {img.shape}")
+        
+        # 2. Convert BGR to RGB
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        
+        # 3. Resize to 150x150 (MATCHES YOUR CNN TRAINING SIZE!)
+        img_resized = cv2.resize(img_rgb, (150, 150))
+        
+        # 4. Normalize to [0, 1]
+        img_normalized = img_resized.astype(np.float32) / 255.0
+        
+        # 5. Add batch dimension: (1, 150, 150, 3)
+        img_batch = np.expand_dims(img_normalized, axis=0)
+        
+        print(f"✅ Preprocessed shape: {img_batch.shape}")
+        
+        # 6. Get prediction from your CNN model
+        preds = condition_model.predict(img_batch, verbose=0)[0]
+        
+        # 7. Apply softmax (your model already has softmax, but for safety)
+        exp_preds = np.exp(preds - np.max(preds))
+        preds_softmax = exp_preds / np.sum(exp_preds)
+        
+        # 8. Get top prediction
+        # Your CNN classes: ["healthy", "injured", "malnourished"]
+        class_names = ["Healthy", "Injured", "Malnourished"]
+        top_idx = int(np.argmax(preds_softmax))
+        top_confidence = float(preds_softmax[top_idx]) * 100
+        top_condition = class_names[top_idx]
+        
+        # Debug output
+        print(f"📊 Condition probabilities:")
+        for i, (name, prob) in enumerate(zip(class_names, preds_softmax)):
+            arrow = " ⬅ PREDICTED" if i == top_idx else ""
+            print(f"   {name}: {prob*100:5.1f}%{arrow}")
+        
+        print(f"🎯 Final prediction: {top_condition} ({top_confidence:.1f}%)")
+        
+        return {
+            "label": top_condition, 
+            "confidence": round(top_confidence, 2),
+            "probabilities": {
+                "healthy": float(preds_softmax[0]) * 100,
+                "injured": float(preds_softmax[1]) * 100,
+                "malnourished": float(preds_softmax[2]) * 100
+            }
+        }
+        
     except Exception as e:
-        return {"error": f"Condition analysis failed: {str(e)}"}
+        print(f"❌ Condition analysis error: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"label": "Unknown", "confidence": 0.0}
 
 def get_animal_info(species_name: str):
-    if animal_data_df is None:
+    # Fixed: Check if animal_data_df is not None and is a DataFrame
+    if animal_data_df is None or not isinstance(animal_data_df, pd.DataFrame):
         return None
     
     try:
@@ -631,7 +950,15 @@ def get_animal_info(species_name: str):
                 animal_data_df[col] = animal_data_df[col].fillna('')
                 match = animal_data_df[animal_data_df[col].str.lower() == species_name.lower()]
                 if not match.empty:
-                    found_data = match.iloc[0].to_dict()
+                    # Fixed: Ensure we're working with a proper pandas Series, not bytes
+                    row_data = match.iloc[0]
+                    if hasattr(row_data, 'to_dict'):
+                        found_data = row_data.to_dict()
+                    else:
+                        # Fallback: manually create dict if to_dict() fails
+                        found_data = {}
+                        for key in match.columns:
+                            found_data[key] = row_data[key] if key in row_data else None
                     break
         
         if found_data:
@@ -644,11 +971,13 @@ def get_animal_info(species_name: str):
                 'lifespan': 'lifespan',
                 'health_recommendation_injured': 'care_injured',
                 'health_recommendation_malnourished': 'care_malnourished',
-                'health_recommendation': 'care_general'
+                'health_recommendation': 'care_general',
+                'character_traits': 'character_traits'  # ADDED: Character traits mapping
             }
             
             for original_key, value in found_data.items():
-                if pd.notna(value) and original_key in column_mapping:
+                # Fixed: Properly check for NaN/None values
+                if value is not None and not (isinstance(value, float) and np.isnan(value)) and original_key in column_mapping:
                     new_key = column_mapping[original_key]
                     clean_data[new_key] = value
             
@@ -671,7 +1000,26 @@ def process_frame(frame, model_choice):
         for i, model in enumerate(selected_models):
             try:
                 print(f"🔍 Running model {i+1}...")
-                results = model.predict(temp_path, conf=0.25)
+                
+                # FIX: Add cleanup for ONNX runtime between predictions
+                if hasattr(model, '_session'):
+                    try:
+                        # Release ONNX session resources
+                        import gc
+                        del model._session
+                        gc.collect()
+                    except:
+                        pass
+                
+                # FIX: Use smaller batch size and explicit cleanup
+                results = model.predict(
+                    temp_path, 
+                    conf=0.25,
+                    verbose=False,  # Reduce output noise
+                    imgsz=640,
+                    max_det=10  # Limit max detections per frame
+                )
+                
                 print(f"🔍 Model {i+1} returned {len(results)} results")
                 
                 for r in results:
@@ -689,8 +1037,20 @@ def process_frame(frame, model_choice):
                                     "confidence": conf,
                                     "animal_info": animal_info
                                 }
+                
+                # FIX: Force cleanup after each model
+                if hasattr(model, '_session'):
+                    try:
+                        import gc
+                        del model
+                        gc.collect()
+                    except:
+                        pass
+                        
             except Exception as e:
                 print(f"❌ Model {i+1} error in frame processing: {e}")
+                import traceback
+                traceback.print_exc()
                 continue
         
         if os.path.exists(temp_path):
@@ -699,6 +1059,8 @@ def process_frame(frame, model_choice):
         return list(aggregated.values())
     except Exception as e:
         print(f"❌ Frame processing error: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 # ================= UPDATED DATABASE FUNCTIONS =================
@@ -721,6 +1083,7 @@ def create_sighting_record(user_id, detection_data, condition_result, image_file
             sighting.habitat = animal_info.get('habitat')
             sighting.lifespan = animal_info.get('lifespan')
             sighting.population = animal_info.get('population')
+            sighting.character_traits = animal_info.get('character_traits')  # ADDED: Character traits
             
             # FIXED: Better condition detection for care recommendations
             condition_label = condition_result.get('label', '').lower()
@@ -830,6 +1193,8 @@ def create_report_record(user_id, sighting_id, image_filename, detection_type, s
             description += f"Population: {sighting.population}. "
         if sighting.recommended_care:
             description += f"Recommended Care: {sighting.recommended_care}"
+        if sighting.character_traits:  # ADDED: Character traits in description
+            description += f"Character Traits: {sighting.character_traits}"
             
         report.description = description
         report.report_type = 'sighting'
@@ -925,6 +1290,48 @@ def create_auto_notification(report_id, status_change=False):
         return None
 
 # ================= ROUTES =================
+
+# NEW ADD CODE UPDATE =================
+# GENERATE TOKEN OTP
+def generate_token(length=6):
+    characters = string.ascii_uppercase + string.digits
+    return ''.join(random.choice(characters) for _ in range(length))
+
+# MAILER
+from flask_mail import Message
+
+def send_verification_email(email, token):
+    msg = Message(
+        subject="Verify Your Email",
+        recipients=[email]
+    )
+
+    # ✅ HTML email (BIG + BOLD TOKEN)
+    msg.html = f"""
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+        <h2>Email Verification</h2>
+        <p>Thank you for registering.</p>
+        <p>Your verification code is:</p>
+
+        <div style="
+            font-size: 32px;
+            font-weight: bold;
+            letter-spacing: 5px;
+            color: #16a34a;
+            margin: 20px 0;
+        ">
+            {token}
+        </div>
+
+        <p>This code will expire soon.</p>
+        <p>If you did not request this, please ignore this email.</p>
+    </div>
+    """
+
+    mail.send(msg)
+
+
+
 @app.route('/register', methods=['POST'])
 def register():
     try:
@@ -932,29 +1339,66 @@ def register():
         username = data.get('username')
         email = data.get('email')
         password = data.get('password')
-        
+
         if not all([username, email, password]):
             return jsonify({'error': 'Missing required fields'}), 400
-        
+
         if User.query.filter_by(username=username).first():
             return jsonify({'error': 'Username already exists'}), 400
-            
+
         if User.query.filter_by(email=email).first():
             return jsonify({'error': 'Email already exists'}), 400
-        
-        user = User()
-        user.username = username
-        user.email = email
+
+        token = generate_token(6)
+
+        user = User(
+            username=username,
+            email=email,
+            email_verification_token=token,
+            is_verified=False
+        )
         user.set_password(password)
-        
+
         db.session.add(user)
         db.session.commit()
-        
+
+        # 🔥 Send verification email
+        send_verification_email(email, token)
+
         return jsonify({
-            'message': 'User created successfully',
+            'message': 'User registered successfully. Verification email sent.',
             'user': user.to_dict()
         }), 201
-        
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# UPDATE =================
+@app.route('/verify-email', methods=['POST'])
+def verify_email():
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        token = data.get('token')
+
+        if not email or not token:
+            return jsonify({'error': 'Email and token are required'}), 400
+
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        if user.is_verified:
+            return jsonify({'message': 'Email is already verified'}), 200
+
+        if user.email_verification_token == token:
+            user.is_verified = True
+            user.email_verification_token = None  # clear token after verification
+            db.session.commit()
+            return jsonify({'message': 'Email verified successfully'}), 200
+        else:
+            return jsonify({'error': 'Invalid token'}), 400
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -983,6 +1427,7 @@ def login():
             
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    
 
 # ================= DEBUG & UTILITY ROUTES =================
 @app.route('/debug-sightings', methods=['GET'])
@@ -1009,6 +1454,7 @@ def debug_sightings():
             'lifespan': s.lifespan,
             'population': s.population,
             'recommended_care': s.recommended_care,
+            'character_traits': s.character_traits,  # ADDED: Character traits
             'sighting_date': s.sighting_date.isoformat() if s.sighting_date else None,
             'specific_location': s.specific_location,
             'number_of_animals': s.number_of_animals,
@@ -1184,41 +1630,97 @@ def detect_video():
         video_path = os.path.join(UPLOAD_DIR, unique_filename)
         file.save(video_path)
         print(f"💾 Saved video: {unique_filename}")
+        
+        # ✅ ADDED: Verify the video was saved successfully
+        if os.path.exists(video_path):
+            file_size = os.path.getsize(video_path)
+            print(f"✅ Video file verified: {unique_filename} ({file_size} bytes)")
+        else:
+            print(f"❌ ERROR: Video file was not saved!")
+            return jsonify({"error": "Failed to save video file"}), 500
 
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
-            if os.path.exists(video_path):
-                os.remove(video_path)
+            # Don't delete the video file if it can't be opened
+            print(f"❌ Could not open video file: {unique_filename}")
             return jsonify({"error": "Could not open video file"}), 400
 
         all_detections = []
         frame_count = 0
-        sample_rate = 10
+        sample_rate = 30  # Increased to process fewer frames
+        max_frames = 50   # Limit total frames processed
         
         condition_result = {"label": "Unknown", "confidence": 0}
+        frame_detections = []
+        
+        # FIX: Initialize model once at the beginning
+        selected_models = models.get(model_choice, [])
         
         while True:
             ret, frame = cap.read()
-            if not ret:
+            if not ret or frame_count >= max_frames:
                 break
                 
             frame_count += 1
             if frame_count % sample_rate != 0:
                 continue
                 
+            print(f"📊 Processing frame {frame_count}...")
+            
             detections = process_frame(frame, model_choice)
             all_detections.extend(detections)
             
-            if frame_count > 100:
-                break
+            # Save a frame for condition analysis if we have detections
+            if detections and not frame_detections:
+                frame_detections = detections
+                # Save frame for condition analysis
+                temp_condition_path = os.path.join(UPLOAD_DIR, f"temp_condition_{uuid.uuid4()}.jpg")
+                cv2.imwrite(temp_condition_path, frame)
+                
+                try:
+                    condition_result = analyze_condition(temp_condition_path)
+                    print(f"✅ Condition analyzed: {condition_result}")
+                except Exception as e:
+                    print(f"⚠️ Condition analysis failed for video frame: {e}")
+                    condition_result = {"label": "Unknown", "confidence": 0}
+                
+                # Clean up temp file
+                if os.path.exists(temp_condition_path):
+                    os.remove(temp_condition_path)
+            
+            # FIX: Explicit garbage collection after each frame
+            import gc
+            gc.collect()
 
         cap.release()
+        
+        # ✅ FIXED: DO NOT DELETE THE VIDEO FILE!
+        # The video file must stay in uploads so it can be used when creating reports
+        # if os.path.exists(video_path):
+        #     os.remove(video_path)  # ❌ REMOVED THIS LINE!
+        
+        # ✅ ADDED: Create a thumbnail for video preview
+        thumbnail_filename = None
+        try:
+            # Extract first frame as thumbnail
+            cap = cv2.VideoCapture(video_path)
+            if cap.isOpened():
+                ret, thumbnail_frame = cap.read()
+                if ret:
+                    thumbnail_filename = f"thumb_{unique_filename.replace('.mp4', '.jpg')}"
+                    thumbnail_path = os.path.join(UPLOAD_DIR, thumbnail_filename)
+                    cv2.imwrite(thumbnail_path, thumbnail_frame)
+                    print(f"✅ Created video thumbnail: {thumbnail_filename}")
+                cap.release()
+        except Exception as e:
+            print(f"⚠️ Could not create video thumbnail: {e}")
         
         # ✅ FIXED: REMOVED automatic database storage
         best_detection = max(all_detections, key=lambda x: x["confidence"]) if all_detections else None
         
         response = {
             "filename": unique_filename,
+            "thumbnail": thumbnail_filename,  # ✅ ADDED: Thumbnail for preview
             "detections": [best_detection] if best_detection else [],
             "condition": condition_result,
             "model_used": model_choice,
@@ -1230,11 +1732,13 @@ def detect_video():
             "can_create_report": bool(best_detection)  # ✅ Indicate that user CAN create report manually
         }
         
-        print(f"✅ Video processing complete: {1 if best_detection else 0} detections - NOT saved to database")
+        print(f"✅ Video processing complete: {1 if best_detection else 0} detections - Video file preserved: {unique_filename}")
         return jsonify(response)
 
     except Exception as e:
         print(f"💥 Video processing error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": f"Video processing failed: {str(e)}"}), 500
 
 @app.route('/detect-frame', methods=['POST'])
@@ -1249,64 +1753,79 @@ def detect_frame():
         model_choice = request.form.get('model_choice', 'mammals')
         user_id = request.form.get('user_id')
         
-        location_lat = request.form.get('location_lat')
-        location_lng = request.form.get('location_lng')
-        
-        # Get COMPLETE sighting details from form data
-        sighting_details = {}
-        sighting_details_str = request.form.get('sighting_details')
-        if sighting_details_str and sighting_details_str.strip():
-            try:
-                sighting_details = json.loads(sighting_details_str)
-                print(f"🔍 COMPLETE Sighting details received in frame detect: {sighting_details}")
-            except Exception as e:
-                print(f"⚠️ Could not parse sighting details: {e}")
-        
         if file.filename == '':
             return jsonify({"error": "No file selected"}), 400
 
         if not user_id:
             return jsonify({"error": "User ID is required"}), 400
 
-        unique_filename = f"realtime_{uuid.uuid4()}.jpg"
-        frame_path = os.path.join(UPLOAD_DIR, unique_filename)
-        file.save(frame_path)
-        print(f"💾 Saved real-time frame: {unique_filename}")
+        # ✅ FIXED: DO NOT SAVE THE FRAME TO DISK - keep it in memory only
+        # Read the file into memory but don't save it permanently
+        file_data = file.read()
+        
+        # Convert to numpy array for processing
+        nparr = np.frombuffer(file_data, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if frame is None:
+            print(f"❌ Could not decode frame from uploaded data")
+            return jsonify({"error": "Failed to process frame"}), 500
+        
+        # Process the frame for detection
+        temp_path = None
+        try:
+            # Create a temporary file for condition analysis (in memory)
+            temp_filename = f"temp_frame_{uuid.uuid4()}.jpg"
+            temp_path = os.path.join(UPLOAD_DIR, temp_filename)
+            
+            # Save temporarily for condition analysis
+            cv2.imwrite(temp_path, frame)
+            
+            # Get detections
+            detections = process_frame(frame, model_choice)
+            
+            # Analyze condition for the frame
+            try:
+                condition_result = analyze_condition(temp_path)
+            except Exception as e:
+                print(f"⚠️ Condition analysis failed for real-time frame: {e}")
+                condition_result = {"label": "Unknown", "confidence": 0}
+                
+        finally:
+            # ✅ CRITICAL: Clean up temporary file immediately after processing
+            if temp_path and os.path.exists(temp_path):
+                os.remove(temp_path)
+                print(f"🗑️  Cleaned up temporary frame: {os.path.basename(temp_path)}")
 
-        frame = cv2.imread(frame_path)
-        detections = process_frame(frame, model_choice)
-        condition_result = analyze_condition(frame_path)
-
-        # ✅ FIXED: REMOVED automatic database storage and duplicate checking
+        # Find best detection
         best_detection = max(detections, key=lambda x: x["confidence"]) if detections else None
         
+        # ✅ FIXED: Return data but DO NOT save permanently
         response = {
             "detections": detections,
             "condition": condition_result,
             "model_used": model_choice,
             "animal_data_available": animal_data_df is not None,
             "detection_type": "real-time",
-            "image_path": unique_filename,
-            "filename": unique_filename,
-            "report_data": None,  # ✅ No report data since nothing is saved
-            "is_duplicate": False,  # ✅ No duplicate checking since nothing is saved
-            "sighting_id": None,  # ✅ No sighting ID since nothing is saved
-            "can_create_report": bool(detections)  # ✅ Indicate that user CAN create report manually
+            "image_saved": False,  # ✅ Indicate image was NOT saved
+            "frame_in_memory": True,  # ✅ Frame is in memory, not on disk
+            "can_create_report": bool(detections),
+            "note": "Frame processed in memory only. Image will be saved when report is submitted."
         }
         
-        print(f"✅ Real-time frame processing complete: {len(detections)} detections - NOT saved to database")
+        print(f"✅ Real-time frame processing complete: {len(detections)} detections (NO permanent save)")
         return jsonify(response)
 
     except Exception as e:
         print(f"💥 Real-time frame processing error: {e}")
-        if 'frame_path' in locals() and os.path.exists(frame_path):
-            os.remove(frame_path)
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": f"Real-time processing failed: {str(e)}"}), 500
 
-# ================= MANUAL REPORT CREATION ENDPOINT =================
+# ================= FIXED MANUAL REPORT CREATION ENDPOINT =================
 @app.route('/create-report', methods=['POST'])
 def create_report():
-    """Manual report creation endpoint - only saves when user explicitly requests it"""
+    """Manual report creation endpoint - creates both sighting and report when user clicks Report button"""
     try:
         if not request.is_json:
             return jsonify({"error": "Content-Type must be application/json"}), 400
@@ -1342,32 +1861,148 @@ def create_report():
         sighting_details = data.get('sighting_details', {})
         print(f"🔍 Sighting details for manual report: {sighting_details}")
         
-        # Create sighting record (only when user explicitly requests)
-        sighting = create_sighting_record(
-            user_id=user_id,
-            detection_data=detection_data,
-            condition_result=condition_result,
-            image_filename=image_filename,
-            detection_type=detection_type,
-            location_data=location_data,
-            sighting_details=sighting_details
-        )
+        # Get animal info for the detected species
+        species_name = detection_data.get('class', 'Unknown Species')
+        animal_info = get_animal_info(species_name)
+        print(f"🔍 Animal info for {species_name}: {animal_info}")
         
-        if not sighting:
-            return jsonify({"error": "Failed to create sighting record"}), 500
+        # Create sighting record
+        sighting = Sighting()
+        sighting.user_id = int(user_id)
+        sighting.species = species_name
+        sighting.confidence = float(detection_data.get('confidence', 0))
+        sighting.condition = condition_result.get('label', 'Unknown')
+        sighting.condition_confidence = float(condition_result.get('confidence', 0))
+        sighting.image_path = image_filename
+        sighting.detection_type = detection_type
+        
+        # Set animal information
+        if animal_info:
+            sighting.conservation_status = animal_info.get('conservation_status')
+            sighting.habitat = animal_info.get('habitat')
+            sighting.lifespan = animal_info.get('lifespan')
+            sighting.population = animal_info.get('population')
+            sighting.character_traits = animal_info.get('character_traits')  # ADDED: Character traits
+            
+            # Set care recommendations based on condition
+            condition_label = condition_result.get('label', '').lower()
+            print(f"🔍 Condition label: {condition_label}")
+            
+            if condition_label == 'injured':
+                sighting.recommended_care = animal_info.get('care_injured') or animal_info.get('care_general') or "Provide medical attention and safe shelter"
+            elif condition_label == 'malnourished':
+                sighting.recommended_care = animal_info.get('care_malnourished') or animal_info.get('care_general') or "Provide proper nutrition and hydration"
+            else:
+                sighting.recommended_care = animal_info.get('care_general') or "Monitor condition and provide appropriate habitat"
+            print(f"🔍 Setting default care: {sighting.recommended_care}")
+        
+        # Set location data
+        if location_data:
+            sighting.location_lat = location_data.get('lat')
+            sighting.location_lng = location_data.get('lng')
+        
+        # Process sighting details
+        if sighting_details:
+            print(f"🔍 Processing COMPLETE sighting details: {sighting_details}")
+            
+            # Extract all fields
+            date_time = sighting_details.get('date_time') or sighting_details.get('sighting_date')
+            specific_location = sighting_details.get('specific_location') or sighting_details.get('location', '')
+            number_of_animals = sighting_details.get('number_of_animals', 1)
+            behavior_observed = sighting_details.get('behavior_observed') or sighting_details.get('behavior', '')
+            observer_notes = sighting_details.get('observer_notes') or sighting_details.get('your_observations') or sighting_details.get('notes', '')
+            user_contact = sighting_details.get('user_contact') or sighting_details.get('contact_info', '')
+            urgency_level = sighting_details.get('urgency_level') or sighting_details.get('urgency', 'medium')
+            
+            if date_time:
+                try:
+                    sighting.sighting_date = datetime.fromisoformat(date_time.replace('Z', '+00:00'))
+                    print(f"✅ Set sighting date: {sighting.sighting_date}")
+                except (ValueError, TypeError) as e:
+                    print(f"⚠️ Could not parse date {date_time}: {e}")
+                    sighting.sighting_date = datetime.utcnow()
+            
+            sighting.specific_location = specific_location
+            sighting.number_of_animals = number_of_animals
+            sighting.behavior_observed = behavior_observed
+            sighting.observer_notes = observer_notes
+            sighting.user_contact = user_contact
+            sighting.urgency_level = urgency_level
+            
+            print(f"✅ Set all detailed fields:")
+            print(f"   - Location: {sighting.specific_location}")
+            print(f"   - Animals: {sighting.number_of_animals}")
+            print(f"   - Behavior: {sighting.behavior_observed}")
+            print(f"   - Notes: {sighting.observer_notes}")
+            print(f"   - Contact: {sighting.user_contact}")
+            print(f"   - Urgency: {sighting.urgency_level}")
+        
+        db.session.add(sighting)
+        db.session.commit()
+        
+        print(f"✅ Sighting saved with COMPLETE detailed info: {sighting.species} (ID: {sighting.id})")
         
         # Create report record
-        report = create_report_record(
-            user_id=user_id,
-            sighting_id=sighting.id,
-            image_filename=image_filename,
-            detection_type=detection_type,
-            sighting_details=sighting_details
+        report = Report()
+        report.user_id = int(user_id)
+        report.sighting_id = sighting.id
+        report.title = f"{detection_type.title()} Sighting: {sighting.species}"
+        
+        # Build comprehensive description
+        description = (
+            f"Automated {detection_type} detection of {sighting.species} with "
+            f"{(sighting.confidence * 100):.1f}% confidence. "
+            f"Condition: {sighting.condition} ({sighting.condition_confidence:.1f}%). "
         )
         
-        if not report:
-            return jsonify({"error": "Failed to create report record"}), 500
+        if sighting.specific_location:
+            description += f"Location: {sighting.specific_location}. "
+        if sighting.sighting_date:
+            description += f"Sighting Date: {sighting.sighting_date.strftime('%Y-%m-%d %H:%M')}. "
+        if sighting.number_of_animals and sighting.number_of_animals > 1:
+            description += f"Number of Animals: {sighting.number_of_animals}. "
+        if sighting.behavior_observed:
+            description += f"Behavior: {sighting.behavior_observed}. "
+        if sighting.observer_notes:
+            description += f"Observer Notes: {sighting.observer_notes}. "
         
+        if sighting.conservation_status:
+            description += f"Conservation Status: {sighting.conservation_status}. "
+        if sighting.habitat:
+            description += f"Habitat: {sighting.habitat}. "
+        if sighting.lifespan:
+            description += f"Lifespan: {sighting.lifespan}. "
+        if sighting.population:
+            description += f"Population: {sighting.population}. "
+        if sighting.recommended_care:
+            description += f"Recommended Care: {sighting.recommended_care}"
+        if sighting.character_traits:  # ADDED: Character traits in description
+            description += f"Character Traits: {sighting.character_traits}"
+            
+        report.description = description
+        report.report_type = 'sighting'
+        report.urgency = sighting.urgency_level or 'medium'
+        report.evidence_images = [image_filename]
+        report.location_lat = sighting.location_lat
+        report.location_lng = sighting.location_lng
+        
+        # Store detailed sighting data
+        if sighting_details:
+            report.detailed_sighting_data = {
+                'sighting_date': sighting.sighting_date.isoformat() if sighting.sighting_date else None,
+                'specific_location': sighting.specific_location,
+                'number_of_animals': sighting.number_of_animals,
+                'behavior_observed': sighting.behavior_observed,
+                'observer_notes': sighting.observer_notes,
+                'user_contact': sighting.user_contact,
+                'urgency_level': sighting.urgency_level,
+                'reporter_name': sighting_details.get('reporter_name', 'Unknown User')
+            }
+        
+        db.session.add(report)
+        db.session.commit()
+        
+        print(f"✅ Report created with detailed data for sighting {sighting.id}")
         print(f"✅ Manual report created: {sighting.species} (Sighting ID: {sighting.id}, Report ID: {report.id})")
         
         return jsonify({
@@ -1502,6 +2137,7 @@ def report_sighting():
                 sighting.habitat = animal_info.get('habitat')
                 sighting.lifespan = animal_info.get('lifespan')
                 sighting.population = animal_info.get('population')
+                sighting.character_traits = animal_info.get('character_traits')  # ADDED: Character traits
                 condition_label = sighting.condition.lower() if sighting.condition else ''
                 if condition_label == 'injured':
                     sighting.recommended_care = animal_info.get('care_injured') or animal_info.get('care_general') or "Provide medical attention"
@@ -1574,6 +2210,8 @@ def report_sighting():
                 description += f"Population: {sighting.population}. "
             if sighting.recommended_care:
                 description += f"Recommended Care: {sighting.recommended_care}"
+            if sighting.character_traits:  # ADDED: Character traits in description
+                description += f"Character Traits: {sighting.character_traits}"
                 
             report.description = description
             report.urgency = sighting.urgency_level or 'medium'
@@ -1621,6 +2259,8 @@ def report_sighting():
                 description += f"Population: {sighting.population}. "
             if sighting.recommended_care:
                 description += f"Recommended Care: {sighting.recommended_care}"
+            if sighting.character_traits:  # ADDED: Character traits in description
+                description += f"Character Traits: {sighting.character_traits}"
                 
             report.description = description
             report.report_type = 'sighting'
@@ -1721,6 +2361,7 @@ def get_all_user_reports():
                     'lifespan': sighting.lifespan,
                     'population': sighting.population,
                     'recommended_care': sighting.recommended_care,
+                    'character_traits': sighting.character_traits,  # ADDED: Character traits
                     'sighting_date': sighting.sighting_date.isoformat() if sighting.sighting_date else None,
                     'specific_location': sighting.specific_location,
                     'number_of_animals': sighting.number_of_animals,
@@ -1742,7 +2383,8 @@ def get_all_user_reports():
                     'habitat': None,
                     'lifespan': None,
                     'population': None,
-                    'recommended_care': None
+                    'recommended_care': None,
+                    'character_traits': None,  # ADDED: Character traits
                 })
             
             formatted_reports.append(report_data)
@@ -1932,7 +2574,8 @@ def get_user_notifications():
                     'detection_type': sighting.detection_type,
                     'conservation_status': sighting.conservation_status,
                     'habitat': sighting.habitat,
-                    'population': sighting.population
+                    'population': sighting.population,
+                    'character_traits': sighting.character_traits,  # ADDED: Character traits
                 })
             
             notifications_data.append(notification_data)
@@ -2015,6 +2658,7 @@ def get_user_notifications_by_id(user_id):
                         'habitat': sighting.habitat,
                         'population': sighting.population,
                         'recommended_care': sighting.recommended_care,
+                        'character_traits': sighting.character_traits,  # ADDED: Character traits
                         'image_path': sighting.image_path,
                         'evidence_images': report.evidence_images or []
                     })
@@ -2074,6 +2718,57 @@ def mark_all_notifications_read():
         db.session.rollback()
         print(f"❌ Error in mark_all_notifications_read: {e}")
         return jsonify({'error': 'Failed to mark all notifications as read'}), 500
+    
+# ✅ ADD THIS SIMPLE STATUS UPDATE ENDPOINT
+@app.route('/api/reports/<int:report_id>/update-status', methods=['PATCH'])
+def update_report_status_only(report_id):
+    """Simple endpoint to update report status only - for frontend compatibility"""
+    try:
+        data = request.get_json()
+        new_status = data.get('status')
+        admin_name = data.get('admin_name', 'Admin')  # Default to 'Admin' if not provided
+        
+        if not new_status:
+            return jsonify({'error': 'Status is required'}), 400
+            
+        report = Report.query.get(report_id)
+        if not report:
+            return jsonify({'error': 'Report not found'}), 404
+        
+        # Save previous status for history
+        previous_status = report.status
+        
+        # Update the report
+        report.status = new_status
+        report.updated_at = datetime.utcnow()
+        
+        # Create admin history record
+        history = create_admin_history(
+            report_id=report_id,
+            admin_name=admin_name,
+            action='status_update',
+            notes=f"Status changed from {previous_status} to {new_status}",
+            previous_status=previous_status,
+            new_status=new_status
+        )
+        
+        # Send auto-notification if status changed
+        if previous_status != new_status:
+            create_auto_notification(report_id, status_change=True)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Report status updated from {previous_status} to {new_status}',
+            'report': report.to_dict(),
+            'history_created': history is not None
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Error in update_report_status_only: {e}")
+        return jsonify({'error': str(e)}), 500
 
 # ✅ FIXED: User Reports API with Admin History
 @app.route('/api/user/<int:user_id>/reports', methods=['GET'])
@@ -2117,6 +2812,7 @@ def get_user_reports_api(user_id):
                 'habitat': '',
                 'population': '',
                 'recommended_care': '',
+                'character_traits': '',  # ADDED: Character traits
                 'admin_notes': report.admin_notes or '',
                 'status': report.status or 'pending',
                 'is_manual_report': report.sighting_id is None,
@@ -2143,6 +2839,7 @@ def get_user_reports_api(user_id):
                     'habitat': sighting.habitat or '',
                     'population': sighting.population or '',
                     'recommended_care': sighting.recommended_care or '',
+                    'character_traits': sighting.character_traits or '',  # ADDED: Character traits
                     # ✅ ADDED: Detailed sighting information from sighting table
                     'sighting_date': sighting.sighting_date.isoformat() if sighting.sighting_date else None,
                     'specific_location': sighting.specific_location,
@@ -2188,6 +2885,52 @@ def notify_user(report_id):
             return jsonify({'error': 'Report not found'}), 404
         
         user_id = report.user_id
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        # Get user email and name
+        user_email = user.email
+        user_name = user.username
+        
+        # Get report details for email
+        report_species = report.sighting.species if report.sighting else 'Reported Wildlife'
+        report_status = data.get('status')
+        
+        # Get report details for email
+        report_details = ""
+        if report.sighting:
+            sighting = report.sighting
+            details = []
+            if sighting.condition and sighting.condition != 'Unknown':
+                details.append(f"Condition: {sighting.condition}")
+            if sighting.detection_type:
+                details.append(f"Detection Type: {sighting.detection_type}")
+            if sighting.specific_location:
+                details.append(f"Location: {sighting.specific_location}")
+            if sighting.urgency_level:
+                details.append(f"Urgency: {sighting.urgency_level.title()}")
+            if sighting.character_traits:
+                details.append(f"Character Traits: {sighting.character_traits}")
+            
+            if details:
+                report_details = "<br>".join(details)
+        
+        # ✅ FIXED: Send email notification FIRST
+        email_sent = False
+        try:
+            email_sent = send_admin_update_email(
+                user_email=user_email,
+                user_name=user_name,
+                report_species=report_species,
+                admin_message=data.get('message', ''),
+                report_status=report_status,
+                report_details=report_details
+            )
+            print(f"✅ Email sending attempt completed: {'Success' if email_sent else 'Failed'}")
+        except Exception as email_error:
+            print(f"⚠️ Email sending error (will continue with app notification): {email_error}")
         
         # ✅ FIXED: Get COMPLETE sighting data including detailed information
         sighting_data = {}
@@ -2203,9 +2946,9 @@ def notify_user(report_id):
                 'habitat': sighting.habitat,
                 'population': sighting.population,
                 'recommended_care': sighting.recommended_care,
+                'character_traits': sighting.character_traits,
                 'image_path': sighting.image_path,
                 'evidence_images': report.evidence_images or [],
-                # ✅ ADDED: Detailed sighting information
                 'detailed_sighting_data': {
                     'sighting_date': sighting.sighting_date.isoformat() if sighting.sighting_date else None,
                     'specific_location': sighting.specific_location,
@@ -2214,17 +2957,9 @@ def notify_user(report_id):
                     'observer_notes': sighting.observer_notes,
                     'user_contact': sighting.user_contact,
                     'urgency_level': sighting.urgency_level
-                },
-                # ✅ ADDED: Direct fields for backward compatibility
-                'sighting_date': sighting.sighting_date.isoformat() if sighting.sighting_date else None,
-                'specific_location': sighting.specific_location,
-                'number_of_animals': sighting.number_of_animals,
-                'behavior_observed': sighting.behavior_observed,
-                'observer_notes': sighting.observer_notes,
-                'urgency_level': sighting.urgency_level
+                }
             }
         else:
-            # For manual reports, use the detailed_sighting_data from report
             detailed_data = report.detailed_sighting_data or {}
             sighting_data = {
                 'species': 'Reported Wildlife',
@@ -2233,26 +2968,24 @@ def notify_user(report_id):
                 'detection_type': 'manual_report',
                 'image_path': report.evidence_images[0] if report.evidence_images else None,
                 'evidence_images': report.evidence_images or [],
-                # ✅ ADDED: Detailed sighting information from report
-                'detailed_sighting_data': detailed_data,
-                # ✅ ADDED: Direct fields for backward compatibility
-                'sighting_date': detailed_data.get('sighting_date'),
-                'specific_location': detailed_data.get('specific_location'),
-                'number_of_animals': detailed_data.get('number_of_animals'),
-                'behavior_observed': detailed_data.get('behavior_observed'),
-                'observer_notes': detailed_data.get('observer_notes'),
-                'urgency_level': detailed_data.get('urgency_level')
+                'detailed_sighting_data': detailed_data
             }
         
-        # ✅ FIXED: Create notification with complete report_data AND admin_notes
+        # ✅ FIXED: Create notification with email status
         notification = UserNotification(
             user_id=user_id,
             report_id=report_id,
             message=data.get('message', ''),
             status=data.get('status'),
-            admin_notes=data.get('admin_notes') or data.get('message'),  # ✅ Store admin notes here
-            report_data=sighting_data  # ✅ Store complete data here
+            admin_notes=data.get('admin_notes') or data.get('message'),
+            report_data=sighting_data
         )
+        
+        # Add email tracking fields if they exist
+        if hasattr(notification, 'email_sent'):
+            notification.email_sent = email_sent
+        if hasattr(notification, 'email_error') and not email_sent:
+            notification.email_error = "Email sending failed"
         
         # ✅ FIXED: Also update the report with admin notes
         if data.get('admin_notes'):
@@ -2266,23 +2999,25 @@ def notify_user(report_id):
         db.session.add(notification)
         db.session.commit()
         
-        print(f"✅ Notification sent to user {user_id} for report {report_id}")
-        print(f"✅ Admin notes stored in both user_notification and report tables")
-        print(f"✅ Included detailed sighting data with {len(sighting_data.get('detailed_sighting_data', {}))} fields")
+        print(f"✅ Notification processed for user {user_name} (ID: {user_id})")
+        print(f"✅ Email sent: {email_sent}")
+        print(f"✅ App notification created: {notification.id}")
         
         return jsonify({
             'success': True, 
             'message': 'Notification sent to user',
             'notification_id': notification.id,
             'species': sighting_data['species'],
-            'admin_notes_stored': True,
-            'includes_detailed_data': bool(sighting_data.get('detailed_sighting_data')),
-            'detailed_fields_included': list(sighting_data.get('detailed_sighting_data', {}).keys()) if sighting_data.get('detailed_sighting_data') else []
+            'email_sent': email_sent,
+            'user_notified': user_name,
+            'user_email': user_email
         })
         
     except Exception as e:
         db.session.rollback()
         print(f"❌ Error in notify_user: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': f'Failed to send notification: {str(e)}'}), 500
 
 @app.route('/api/admin/notifications', methods=['GET'])
@@ -2316,7 +3051,8 @@ def get_admin_notifications():
                         'confidence': sighting.confidence,
                         'condition': sighting.condition,
                         'detection_type': sighting.detection_type,
-                        'image_path': sighting.image_path
+                        'image_path': sighting.image_path,
+                        'character_traits': sighting.character_traits,  # ADDED: Character traits
                     })
                 else:
                     notification_dict['species'] = 'Manual Report'
@@ -2360,6 +3096,39 @@ def get_notification_stats():
     except Exception as e:
         print(f"❌ Error in get_notification_stats: {e}")
         return jsonify({'error': 'Failed to fetch notification stats'}), 500
+    
+@app.route('/test-condition-detection', methods=['POST'])
+def test_condition_detection():
+    """Test endpoint for condition detection"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({"error": "No file provided"}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"error": "No file selected"}), 400
+        
+        # Save temporary file
+        temp_filename = f"test_condition_{uuid.uuid4()}.jpg"
+        temp_path = os.path.join(UPLOAD_DIR, temp_filename)
+        file.save(temp_path)
+        
+        # Analyze condition
+        result = analyze_condition(temp_path)
+        
+        # Clean up
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        
+        return jsonify({
+            "status": "success",
+            "condition_result": result,
+            "model_used": "CNN (78% accuracy)",
+            "input_size": "150x150 pixels"
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # ================= ADMIN USER MANAGEMENT ROUTES =================
 @app.route('/api/admin/users', methods=['GET'])
@@ -2435,47 +3204,68 @@ def create_user():
         print(f"❌ Error creating user: {e}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/admin/users/<int:user_id>', methods=['PATCH'])
+# ================= ADMIN USER MANAGEMENT ROUTES - ADD MISSING PATCH ENDPOINT =================
+@app.route('/api/admin/users/<int:user_id>', methods=['PATCH', 'PUT'])
 def update_user(user_id):
+    # Handle PATCH/PUT requests
     try:
         data = request.get_json()
         print(f"🔍 Admin: Updating user {user_id} with data: {data}")
+        print(f"🔍 Admin: Method used: {request.method}")
         
         user = User.query.get(user_id)
         
         if not user:
             return jsonify({'error': 'User not found'}), 404
         
+        print(f"🔍 Found user: {user.username}, email: {user.email}")
+        
+        # Update fields if provided
         if 'username' in data:
+            # Check if username is already taken by another user
             existing_user = User.query.filter_by(username=data['username']).first()
             if existing_user and existing_user.id != user_id:
                 return jsonify({'error': 'Username already taken'}), 400
             user.username = data['username']
+            print(f"🔍 Updated username to: {data['username']}")
         
         if 'email' in data:
+            # Check if email is already taken by another user
             existing_user = User.query.filter_by(email=data['email']).first()
             if existing_user and existing_user.id != user_id:
                 return jsonify({'error': 'Email already taken'}), 400
             user.email = data['email']
+            print(f"🔍 Updated email to: {data['email']}")
         
         if 'role' in data:
             user.role = data['role']
+            print(f"🔍 Updated role to: {data['role']}")
         
-        if 'password' in data and data['password']:
+        # Only update password if provided and not empty
+        if 'password' in data and data['password'] and data['password'].strip():
             user.set_password(data['password'])
+            print(f"🔍 Password updated for user {user_id}")
+        
+        # Handle is_active field
+        if 'is_active' in data:
+            user.is_active = bool(data['is_active'])
+            print(f"🔍 Setting user {user_id} is_active to {user.is_active}")
         
         db.session.commit()
         
         print(f"✅ Admin: User {user_id} updated successfully")
+        print(f"✅ Final user data: {user.to_dict()}")
         
         return jsonify({
             'message': 'User updated successfully',
             'user': user.to_dict()
         })
-        
+            
     except Exception as e:
         db.session.rollback()
         print(f"❌ Error updating user: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/admin/users/<int:user_id>/status', methods=['PATCH'])
@@ -2522,6 +3312,27 @@ def delete_user(user_id):
         if current_user_id and int(current_user_id) == user_id:
             return jsonify({'error': 'Cannot delete your own account'}), 400
         
+        # ✅ FIXED: Handle related records properly
+        # First, delete or reassign related sightings
+        sightings = Sighting.query.filter_by(user_id=user_id).all()
+        for sighting in sightings:
+            # Option 1: Delete the sightings (recommended for data integrity)
+            db.session.delete(sighting)
+            print(f"🗑️  Deleting sighting {sighting.id} for user {user_id}")
+        
+        # Delete related reports
+        reports = Report.query.filter_by(user_id=user_id).all()
+        for report in reports:
+            db.session.delete(report)
+            print(f"🗑️  Deleting report {report.id} for user {user_id}")
+        
+        # Delete related notifications
+        notifications = UserNotification.query.filter_by(user_id=user_id).all()
+        for notification in notifications:
+            db.session.delete(notification)
+            print(f"🗑️  Deleting notification {notification.id} for user {user_id}")
+        
+        # Finally delete the user
         db.session.delete(user)
         db.session.commit()
         
@@ -2624,6 +3435,21 @@ def submit_report():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+@app.route('/debug-condition-model', methods=['GET'])
+def debug_condition_model():
+    """Debug endpoint to check condition model status"""
+    try:
+        return jsonify({
+            "condition_model_loaded": condition_model is not None,
+            "condition_model_path": CONDITION_MODEL_PATH,
+            "file_exists": os.path.exists(CONDITION_MODEL_PATH),
+            "tensorflow_version": tf.__version__,
+            "model_input_shape": str(condition_model.input_shape) if condition_model else "None",
+            "model_output_shape": str(condition_model.output_shape) if condition_model else "None"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/reports/stats', methods=['GET'])
 def get_report_stats():
     try:
@@ -2710,6 +3536,20 @@ def delete_report(report_id):
         db.session.rollback()
         print(f"❌ Error deleting report: {e}")
         return jsonify({'error': str(e)}), 500
+    
+# ================= TEST ENDPOINT =================
+@app.route('/api/test-user-update', methods=['PATCH'])
+def test_user_update():
+    """Test endpoint to verify PATCH requests work"""
+    try:
+        data = request.get_json()
+        return jsonify({
+            'message': 'PATCH request received successfully',
+            'received_data': data,
+            'status': 'success'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # ================= ANIMAL INFO ROUTES =================
 @app.route('/animal-info/<species_name>', methods=['GET'])
@@ -2759,6 +3599,7 @@ def debug_report(report_id):
                 'lifespan': sighting.lifespan,
                 'population': sighting.population,
                 'recommended_care': sighting.recommended_care,
+                'character_traits': sighting.character_traits,  # ADDED: Character traits
                 'image_path': sighting.image_path,
                 'detection_type': sighting.detection_type,
                 'sighting_date': sighting.sighting_date.isoformat() if sighting.sighting_date else None,
@@ -2835,17 +3676,15 @@ def debug_db_schema():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    # Get port from environment variable or default to 5000
-    port = int(os.environ.get("PORT", 5000))
-    
     print("\n" + "="*50)
     print("🚀 Animal Detection Backend Starting...")
     print("📍 Project Location:", os.path.dirname(os.path.abspath(__file__)))
-    print("🌐 Running on port:", port)
-    print("🔍 Health Check: /health")
-    print("📱 Server started successfully!")
+    print("🌐 Server URL: http://192.168.100.77:3001")  
+    print("🔍 Health Check: http://192.168.100.77:3001")  
+    print("📱 Mobile Access: http://192.168.100.77:3001")  
+    print("👥 Admin Users: http://192.168.100.77:3001/api/admin/users")  
     
-    # Print all your existing routes information...
+ 
     print("📷 Available Detection Modes:")
     print("   - POST /detect (Image Detection) - NO AUTO SAVING")
     print("   - POST /detect-video (Video Detection) - NO AUTO SAVING") 
@@ -2858,8 +3697,8 @@ if __name__ == '__main__':
     print("   - POST /api/admin/users (Create User)")
     print("   - PATCH /api/admin/users/:id (Update User)")
     print("   - DELETE /api/admin/users/:id (Delete User)")
-    print("✅ Backend ready for production!")
+    print("✅ Backend running on port 3001 to avoid network issues!")  
     print("="*50)
     
-    # Run for production on Render
-    app.run(debug=False, host='0.0.0.0', port=port)
+    
+    app.run(debug=True, host='0.0.0.0', port=3001)

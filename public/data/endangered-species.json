@@ -1,0 +1,402 @@
+[
+  {
+    "id": 1,
+    "name": "Matschie's Tree Kangaroo",
+    "scientificName": "Dendrolagus matschiei",
+    "status": "Endangered",
+    "population": "2,500 - 5,000",
+    "habitat": "Tropical Montane Forests of Papua New Guinea",
+    "threats": ["Habitat loss due to logging", "Hunting for bushmeat", "Climate change affecting food sources"],
+    "image": "/images/endangered/Matschie's Tree Kangaro.jpg"
+  },
+  {
+    "id": 2,
+    "name": "Cotton-headed Tamarin",
+    "scientificName": "Saguinus oedipus",
+    "status": "Critically Endangered",
+    "population": "6,000 - 10,000",
+    "habitat": "Tropical Rainforests of Colombia",
+    "threats": ["Deforestation for agriculture", "Illegal pet trade", "Habitat fragmentation"],
+    "image": "/images/endangered/Cotton-headed Tamarin.jpg"
+  },
+  {
+    "id": 3,
+    "name": "Southern Pig-tailed Macaque",
+    "scientificName": "Macaca nemestrina",
+    "status": "Endangered",
+    "population": "Unknown, but rapidly declining",
+    "habitat": "Forests and Shrublands of Southeast Asia",
+    "threats": ["Habitat destruction for palm oil plantations", "Hunting for bushmeat", "Human-wildlife conflict"],
+    "image": "/images/endangered/Southern Pig-tailed Macaque.jpg"
+  },
+  {
+    "id": 4,
+    "name": "Visayan Warty Pig",
+    "scientificName": "Sus cebifrons",
+    "status": "Critically Endangered",
+    "population": "200 - 300",
+    "habitat": "Rainforests and grasslands of the Visayan Islands, Philippines",
+    "threats": ["Habitat loss to agriculture", "Hunting pressure", "Hybridization with domestic pigs"],
+    "image": "/images/endangered/Visayan Warty Pig.jpg"
+  },
+  {
+    "id": 5,
+    "name": "Philippine Pangolin",
+    "scientificName": "Manis culionensis",
+    "status": "Critically Endangered",
+    "population": "Unknown, severely depleted",
+    "habitat": "Tropical and lowland forests of Palawan, Philippines",
+    "threats": ["Illegal wildlife trade for scales and meat", "Habitat destruction", "Poaching"],
+    "image": "/images/endangered/Philippine Pangolin.png"
+  },
+  {
+    "id": 6,
+    "name": "Cloud Rat",
+    "scientificName": "Crateromys spp., Phloeomys spp.",
+    "status": "Endangered",
+    "population": "Unknown, small isolated populations",
+    "habitat": "Montane forests of the Philippines",
+    "threats": ["Deforestation", "Hunting for food", "Limited geographic range"],
+    "image": "/images/endangered/Cloud Rat.jpg"
+  },
+  {
+    "id": 7,
+    "name": "Gray's Monitor Lizard",
+    "scientificName": "Varanus olivaceus",
+    "status": "Endangered",
+    "population": "Unknown, declining",
+    "habitat": "Tropical forests of the Philippines",
+    "threats": ["Habitat loss", "Illegal pet trade", "Hunting for meat"],
+    "image": "/images/endangered/Gray’s Monitor Lizard.jpg"
+  },
+  {
+    "id": 8,
+    "name": "Calamian Deer",
+    "scientificName": "Axis calamianensis",
+    "status": "Endangered",
+    "population": "900 - 1,500",
+    "habitat": "Forests, savannas and grasslands of Calamian Islands, Philippines",
+    "threats": ["Habitat loss to development", "Hunting", "Human encroachment"],
+    "image": "/images/endangered/Calamian Deer.jpg"
+  },
+  {
+    "id": 9,
+    "name": "Philippine Mouse-deer",
+    "scientificName": "Tragulus nigricans",
+    "status": "Endangered",
+    "population": "Unknown (declining rapidly)",
+    "habitat": "Forests and shrublands of Balabac Island, Philippines",
+    "threats": ["Habitat destruction", "Hunting", "Predation by introduced species"],
+    "image": "/images/endangered/Philippine Mouse-deer.jpg"
+  },
+  {
+    "id": 10,
+    "name": "Giant Golden-crowned Flying Fox",
+    "scientificName": "Acerodon jubatus",
+    "status": "Endangered",
+    "population": "10,000 - 20,000",
+    "habitat": "Lowland forests of the Philippines",
+    "threats": ["Deforestation", "Hunting for bushmeat", "Disturbance at roosting sites"],
+    "image": "/images/endangered/Giant Golden-crowned Flying Fox.jpg"
+  },
+  {
+    "id": 11,
+    "name": "Palawan Binturong",
+    "scientificName": "Arctictis binturong whitei",
+    "status": "Endangered",
+    "population": "Unknown, small population",
+    "habitat": "Tropical rainforests of Palawan, Philippines",
+    "threats": ["Deforestation", "Illegal pet trade", "Habitat fragmentation"],
+    "image": "/images/endangered/Palawan Binturong.jpg"
+  },
+  {
+    "id": 12,
+    "name": "Palawan Tree Shrew",
+    "scientificName": "Tupaia palawanensis",
+    "status": "Endangered",
+    "population": "Unknown",
+    "habitat": "Forests of Palawan, Philippines",
+    "threats": ["Habitat loss", "Predation", "Limited distribution"],
+    "image": "/images/endangered/Palawan Tree Shrew.jpg"
+  },
+  {
+    "id": 13,
+    "name": "Southwest Bornean Orangutan",
+    "scientificName": "Pongo pygmaeus wurmbii",
+    "status": "Endangered",
+    "population": "Unknown, critically low",
+    "habitat": "Lowland and hill rainforests of Borneo",
+    "threats": ["Massive deforestation for palm oil", "Hunting", "Illegal pet trade"],
+    "image": "/images/endangered/Southwest Bornean Orangutan.jpg"
+  },
+  {
+    "id": 14,
+    "name": "Malayan Sun Bear",
+    "scientificName": "Helarctos malayanus",
+    "status": "Endangered",
+    "population": "Unknown (decreasing rapidly)",
+    "habitat": "Tropical forests of Southeast Asia",
+    "threats": ["Deforestation", "Bear bile farming", "Illegal pet trade"],
+    "image": "/images/endangered/Malayan Sun Bear.jpg"
+  },
+  {
+    "id": 15,
+    "name": "Palawan Short-tailed Mongoose",
+    "scientificName": "Herpestes brachyurus palawanus",
+    "status": "Endangered",
+    "population": "Unknown",
+    "habitat": "Forests of Palawan, Philippines",
+    "threats": ["Habitat loss", "Hunting", "Limited range"],
+    "image": "/images/endangered/Palawan Short-tailed Mongoose.jpg"
+  },
+  {
+    "id": 16,
+    "name": "Chinese Bamboo Rat",
+    "scientificName": "Rhizomys sinensis",
+    "status": "Endangered",
+    "population": "Unknown, declining",
+    "habitat": "Bamboo forests of China and Southeast Asia",
+    "threats": ["Habitat loss", "Overhunting for food", "Agriculture expansion"],
+    "image": "/images/endangered/Chinese Bamboo Rat.jpg"
+  },
+  {
+    "id": 17,
+    "name": "Mindanao Squirrel",
+    "scientificName": "Sundasciurus mindanensis",
+    "status": "Vulnerable",
+    "population": "Unknown but stable",
+    "habitat": "Forests of Mindanao, Philippines",
+    "threats": ["Habitat loss", "Predation", "Limited range"],
+    "image": "/images/endangered/Mindanao Squirrel.jpg"
+  },
+  {
+    "id": 18,
+    "name": "Philippine Spotted Deer",
+    "scientificName": "Rusa alfredi",
+    "status": "Endangered",
+    "population": "Estimated fewer than 700 individuals",
+    "habitat": "Primary and secondary forests of Visayas",
+    "threats": ["Deforestation", "Poaching"],
+    "image": "/images/endangered/Philippine Spotted Deer.jpg"
+  },
+  {
+    "id": 19,
+    "name": "Rusty-spotted Genet",
+    "scientificName": "Genetta maculata",
+    "status": "Vulnerable",
+    "population": "Unknown but stable",
+    "habitat": "Forests, savannas and shrublands of Africa",
+    "threats": ["Habitat loss", "Hunting", "Predation"],
+    "image": "/images/endangered/Rusty-spotted Genet.jpg"
+  },
+  {
+    "id": 20,
+    "name": "Oriental Small-clawed Otter",
+    "scientificName": "Aonyx cinereus",
+    "status": "Vulnerable",
+    "population": "Unknown (decreasing)",
+    "habitat": "Freshwater wetlands, mangroves and rice fields of Southeast Asia",
+    "threats": ["Habitat destruction", "Water pollution", "Illegal pet trade"],
+    "image": "/images/endangered/Oriental Small-clawed Otter.jpg"
+  },
+  {
+    "id": 21,
+    "name": "Philippine Cockatoo",
+    "scientificName": "Cacatua haematuropygia",
+    "status": "Critically Endangered",
+    "population": "1,000 - 4,000",
+    "habitat": "Forests and mangroves of the Philippines",
+    "threats": ["Deforestation", "Illegal pet trade", "Hunting"],
+    "image": "/images/endangered/Philippine Cockatoo (Red-vented Cockatoo).jpg"
+  },
+  {
+    "id": 22,
+    "name": "Victoria Crown Pigeon",
+    "scientificName": "Goura victoria",
+    "status": "Near Threatened",
+    "population": "Unknown (decreasing)",
+    "habitat": "Lowland forests of New Guinea and surrounding islands",
+    "threats": ["Habitat loss", "Hunting for meat and feathers", "Pet trade"],
+    "image": "/images/endangered/Victoria Crown Pigeon.jpg"
+  },
+  {
+    "id": 23,
+    "name": "Southern Cassowary",
+    "scientificName": "Casuarius casuarius",
+    "status": "Vulnerable",
+    "population": "1,500 - 2,500",
+    "habitat": "Tropical rainforests of Australia and New Guinea",
+    "threats": ["Habitat loss", "Vehicle strikes", "Dog attacks"],
+    "image": "/images/endangered/Southern Cassowary.jpg"
+  },
+  {
+    "id": 24,
+    "name": "Emu",
+    "scientificName": "Dromaius novaehollandiae",
+    "status": "Near Threatened",
+    "population": "Unknown but stable",
+    "habitat": "Savannas, shrublands and grasslands of Australia",
+    "threats": ["Habitat loss", "Hunting", "Predation"],
+    "image": "/images/endangered/Emu.jpg"
+  },
+  {
+    "id": 25,
+    "name": "Blue-backed Parrot",
+    "scientificName": "Tanygnathus everetti",
+    "status": "Endangered",
+    "population": "Unknown, declining",
+    "habitat": "Forests and savannas of the Philippines",
+    "threats": ["Habitat loss", "Illegal pet trade", "Hunting"],
+    "image": "/images/endangered/Blue backed Parrot.jpg"
+  },
+  {
+    "id": 26,
+    "name": "Mindoro Imperial Pigeon",
+    "scientificName": "Ducula mindorensis",
+    "status": "Critically Endangered",
+    "population": "Unknown, very small population",
+    "habitat": "Lowland forests of Mindoro, Philippines",
+    "threats": ["Deforestation", "Hunting", "Habitat fragmentation"],
+    "image": "/images/endangered/Mindoro Imperial Pigeon.jpg"
+  },
+  {
+    "id": 27,
+    "name": "Isabela Oriole",
+    "scientificName": "Oriolus isabellae",
+    "status": "Critically Endangered",
+    "population": "50 - 250 mature individuals",
+    "habitat": "Forests of Luzon, Philippines",
+    "threats": ["Deforestation", "Hunting", "Habitat fragmentation"],
+    "image": "/images/endangered/Isabela Oriole.jpg"
+  },
+  {
+    "id": 28,
+    "name": "Philippine Eagle Owl",
+    "scientificName": "Bubo philippensis",
+    "status": "Vulnerable",
+    "population": "Unknown",
+    "habitat": "Lowland forests of the Philippines",
+    "threats": ["Habitat loss", "Hunting", "Disturbance"],
+    "image": "/images/endangered/Philippine Owl.jpg"
+  },
+  {
+    "id": 29,
+    "name": "Visayan Hornbill",
+    "scientificName": "Penelopides panini",
+    "status": "Endangered",
+    "population": "1,200 - 2,000",
+    "habitat": "Forests and grasslands of the Visayan Islands, Philippines",
+    "threats": ["Deforestation", "Hunting", "Illegal trade"],
+    "image": "/images/endangered/Visayan Hornbill.jpg"
+  },
+  {
+    "id": 30,
+    "name": "Walden's Hornbill",
+    "scientificName": "Rhabdotorrhinus waldeni",
+    "status": "Critically Endangered",
+    "population": "Unknown, fewer than 1,000",
+    "habitat": "Lowland forests of the Philippines",
+    "threats": ["Deforestation", "Hunting", "Habitat fragmentation"],
+    "image": "/images/endangered/Walden’s Hornbill.jpg"
+  },
+  {
+    "id": 31,
+    "name": "Negros Bleeding Heart Pigeon",
+    "scientificName": "Gallicolumba keayi",
+    "status": "Critically Endangered",
+    "population": "50 - 250 mature individuals",
+    "habitat": "Lowland forests of Negros and Panay, Philippines",
+    "threats": ["Deforestation", "Hunting", "Predation"],
+    "image": "/images/endangered/Negros Bleeding Heart Pigeon.jpg"
+  },
+  {
+    "id": 32,
+    "name": "Pink-bellied Imperial Pigeon",
+    "scientificName": "Ducula poliocephala",
+    "status": "Critically Endangered",
+    "population": "Unknown, very small population",
+    "habitat": "Forests of the Philippines",
+    "threats": ["Deforestation", "Hunting", "Habitat loss"],
+    "image": "/images/endangered/Pink bellied Imperial Pigeon.jpg"
+  },
+  {
+    "id": 33,
+    "name": "Writhed-billed Hornbill",
+    "scientificName": "Rhabdotorrhinus leucocephalus",
+    "status": "Vulnerable",
+    "population": "Unknown, declining",
+    "habitat": "Forests and savannas of the Philippines",
+    "threats": ["Habitat loss", "Hunting", "Illegal trade"],
+    "image": "/images/endangered/Writhed-billed Hornbill.jpg"
+  },
+  {
+    "id": 34,
+    "name": "Philippine Hawk-Eagle",
+    "scientificName": "Nisaetus philippensis",
+    "status": "Endangered",
+    "population": "Unknown, small population",
+    "habitat": "Forests of the Philippines",
+    "threats": ["Deforestation", "Hunting", "Habitat fragmentation"],
+    "image": "/images/endangered/Philippine Hawk-Eagle.png"
+  },
+  {
+    "id": 35,
+    "name": "Philippine Falconet",
+    "scientificName": "Microhierax erythrogenys",
+    "status": "Endangered",
+    "population": "Unknown, declining",
+    "habitat": "Forest edges of the Philippines",
+    "threats": ["Habitat loss", "Hunting", "Pesticide poisoning"],
+    "image": "/images/endangered/Philippine Falconet.jpg"
+  },
+  {
+    "id": 36,
+    "name": "Palawan Peacock-Pheasant",
+    "scientificName": "Polyplectron napoleonis",
+    "status": "Endangered",
+    "population": "2,500 - 10,000",
+    "habitat": "Forests of Palawan, Philippines",
+    "threats": ["Habitat loss", "Hunting", "Illegal pet trade"],
+    "image": "/images/endangered/Palawan Peacock-Pheasant.jpg"
+  },
+  {
+    "id": 37,
+    "name": "Luzon Bleeding-Heart Pigeon",
+    "scientificName": "Gallicolumba luzonica",
+    "status": "Vulnerable",
+    "population": "Unknown (decreasing)",
+    "habitat": "Forests of Luzon, Philippines",
+    "threats": ["Deforestation", "Hunting", "Predation"],
+    "image": "/images/endangered/Luzon Bleeding-Heart Pigeon.jpg"
+  },
+  {
+    "id": 38,
+    "name": "Philippine Duck",
+    "scientificName": "Anas luzonica",
+    "status": "Endangered",
+    "population": "Unknown, declining",
+    "habitat": "Freshwater wetlands, rivers and lakes of the Philippines",
+    "threats": ["Habitat loss", "Hunting", "Pollution"],
+    "image": "/images/endangered/Philippine Duck.jpg"
+  },
+  {
+    "id": 39,
+    "name": "Philippine Eagle",
+    "scientificName": "Pithecophaga jefferyi",
+    "status": "Critically Endangered",
+    "population": "180 - 500",
+    "habitat": "Tropical rainforests of the Philippines",
+    "threats": ["Deforestation", "Hunting", "Electrocution on power lines"],
+    "image": "/images/endangered/Philippine Eagle.png"
+  },
+  {
+    "id": 40,
+    "name": "Philippine Spotted Deer",
+    "scientificName": "Rusa alfredi",
+    "status": "Endangered",
+    "population": "2,500 - 5,000",
+    "habitat": "Forests of the Visayan Islands, Philippines",
+    "threats": ["Habitat loss", "Hunting", "Human encroachment"],
+    "image": "/images/endangered/Philippine Spotted Deer.jpg"
+  }
+]

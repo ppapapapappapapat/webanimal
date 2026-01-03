@@ -6,7 +6,7 @@ type EndangeredSpecies = {
   id: number;
   name: string;
   scientificName: string;
-  status: 'Critically Endangered' | 'Endangered' | 'Vulnerable';
+  status: 'Critically Endangered' | 'Endangered' | 'Vulnerable' | 'Near Threatened';
   population: string;
   habitat: string;
   threats: string[];
@@ -121,7 +121,9 @@ export default function EndangeredSpeciesInfo() {
                         ? 'bg-red-100 text-red-800 hover:bg-red-200'
                         : species.status === 'Endangered'
                           ? 'bg-orange-100 text-orange-800 hover:bg-orange-200'
-                          : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+                          : species.status === 'Vulnerable'
+                            ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+                            : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
                     }`}>
                       {species.status}
                     </span>
@@ -163,7 +165,9 @@ export default function EndangeredSpeciesInfo() {
                       ? 'bg-red-100 text-red-800'
                       : selectedSpecies.status === 'Endangered'
                         ? 'bg-orange-100 text-orange-800'
-                        : 'bg-yellow-100 text-yellow-800'
+                        : selectedSpecies.status === 'Vulnerable'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-blue-100 text-blue-800'
                   }`}>
                     {selectedSpecies.status}
                   </p>
@@ -217,4 +221,4 @@ export default function EndangeredSpeciesInfo() {
       </div>
     </div>
   );
-} 
+}

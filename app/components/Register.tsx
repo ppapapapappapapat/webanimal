@@ -55,13 +55,13 @@ export default function Register() {
 
       // Register the user
       const success = await register(name, email, password);
-      
+
       if (success) {
-        console.log('Registration successful, redirecting to home...');
-        router.push('/');
+        router.push(`/verification?email=${encodeURIComponent(email)}`);
       }
+
       // If not successful, the error is already set in context
-      
+
     } catch (err) {
       console.error('Registration validation error:', err);
       setLocalError(err instanceof Error ? err.message : 'An unexpected error occurred');
@@ -78,7 +78,7 @@ export default function Register() {
           <h1 className="text-3xl font-bold text-green-600">AnimalCare+</h1>
           <p className="mt-2 text-gray-600">Create a new account</p>
         </div>
-        
+
         {displayError && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
             {displayError}
@@ -89,7 +89,7 @@ export default function Register() {
             )}
           </div>
         )}
-        
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm space-y-4">
             <div>
@@ -175,7 +175,7 @@ export default function Register() {
             </button>
           </div>
         </form>
-        
+
         <div className="text-center">
           <p className="text-sm text-gray-600">
             Already have an account?{' '}
